@@ -1,0 +1,2 @@
+Do not use PA9 for USART1
+https://micromouseonline.com/2013/05/05/using-usart1-on-the-stm32f4discovery/
