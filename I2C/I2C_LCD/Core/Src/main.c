@@ -21,7 +21,7 @@
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
-#include "liquidcrystal_i2c.h"
+#include<string.h>
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -31,7 +31,22 @@
 
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
+#define LCD_FUNCTION_SET1      0x33
+#define LCD_FUNCTION_SET2      0x32
+#define LCD_4BIT_2LINE_MODE    0x28
+#define LCD_DISP_CURS_ON       0x0E
+#define LCD_DISP_ON_CURS_OFF   0x0C  //Display on, cursor off
+#define LCD_DISPLAY_OFF        0x08
+#define LCD_DISPLAY_ON         0x04
+#define LCD_CLEAR_DISPLAY      0x01
+#define LCD_ENTRY_MODE_SET     0x04
+#define LCD_INCREMENT_CURSER   0x06
+#define LCD_SET_ROW1_COL1      0x80  //Force cursor to beginning ( 1st line)
+#define LCD_SET_ROW2_COL1      0xC0  //Force cursor to beginning ( 2nd line)
+#define LCD_MOVE_DISPLAY_LEFT  0x18
+#define LCD_MOVE_DISPLAY_RIGHT 0x1C
 
+#define slave_address      0x3F
 /* USER CODE END PD */
 
 /* Private macro -------------------------------------------------------------*/
@@ -52,10 +67,90 @@ static void MX_GPIO_Init(void);
 static void MX_I2C1_Init(void);
 /* USER CODE BEGIN PFP */
 
+void i2c_transmit_command(uint8_t data);
+void lcd_init(void);
+void i2c_transmit_data(uint8_t data);
+
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
+void lcd_init(void) {
+
+	/* Wait for 15ms */
+	HAL_Delay(15);
+
+	/*Function Set - As per HD44780U*/
+	i2c_transmit_command(LCD_FUNCTION_SET1);
+
+	/*Function Set -As per HD44780U*/
+	i2c_transmit_command(LCD_FUNCTION_SET2);
+
+	/*Set 4bit mode and 2 lines */
+	i2c_transmit_command(LCD_4BIT_2LINE_MODE);
+
+	/*Display on, cursor off*/
+	i2c_transmit_command(0x0C);
+
+	/* SET Row1 and Col1 (1st Line) */
+	i2c_transmit_command(0x80);
+
+	/*Clear Display*/
+	i2c_transmit_command(LCD_CLEAR_DISPLAY);
+}
+
+
+
+void i2c_transmit_command(uint8_t data)
+{
+
+	uint8_t command_en_on 	= ( (data & 0xF0) | 0x0C); //LED ON, RW = 0, RS = 0, EN =1;
+	uint8_t command_en_off 	= ( command_en_on & (~(1 << 2)) );  //LED ON, RW = 0, RS = 0, EN =0;
+
+
+	HAL_I2C_Master_Transmit(&hi2c1, slave_address << 1, &command_en_on, 1, 100);
+	HAL_Delay(2);
+	HAL_I2C_Master_Transmit(&hi2c1, slave_address << 1, &command_en_off, 1, 100);
+
+	uint8_t command_lsb_en_on 	= (( (data << 4 ) & 0xF0 ) | 0X0C); //LED ON, RW = 0, RS = 0, EN =1;
+	uint8_t command_lsb_en_off 	= ( command_lsb_en_on & (~(1 << 2)) );  //LED ON, RW = 0, RS = 0, EN =0;
+
+	HAL_I2C_Master_Transmit(&hi2c1, slave_address << 1, &command_lsb_en_on, 1, 100);
+	HAL_Delay(2);
+	HAL_I2C_Master_Transmit(&hi2c1, slave_address << 1, &command_lsb_en_off, 1, 100);
+
+}
+
+
+void i2c_transmit_data(uint8_t data)
+{
+
+
+	uint8_t data_en_on 	= ( (data & 0xF0) | 0x0D); //LED ON, RW = 0, RS = 0, EN =1;
+	uint8_t data_en_off 	= ( data_en_on & (~(1 << 2)) );  //LED ON, RW = 0, RS = 0, EN =0;
+
+	HAL_I2C_Master_Transmit(&hi2c1, slave_address << 1, &data_en_on, 1, 100);
+	HAL_Delay(2);
+	HAL_I2C_Master_Transmit(&hi2c1, slave_address << 1, &data_en_off, 1, 100);
+
+	uint8_t data_lsb_en_on 	= (( (data << 4 ) & 0xF0 ) | 0X0D); //LED ON, RW = 0, RS = 0, EN =1;
+	uint8_t data_lsb_en_off 	= ( data_lsb_en_on & (~(1 << 2)) );  //LED ON, RW = 0, RS = 0, EN =0;
+
+	HAL_I2C_Master_Transmit(&hi2c1, slave_address << 1, &data_lsb_en_on, 1, 100);
+	HAL_Delay(2);
+	HAL_I2C_Master_Transmit(&hi2c1, slave_address << 1, &data_lsb_en_off, 1, 100);
+
+}
+
+void LCD_Send_String(char *str)
+{
+	while (*str)
+	{
+		i2c_transmit_data(*str++);
+	}
+}
+
+
 
 /* USER CODE END 0 */
 
@@ -66,79 +161,29 @@ static void MX_I2C1_Init(void);
 int main(void)
 {
 
-  /* USER CODE BEGIN 1 */
+	  /* MCU Configuration and Initialization */
+	  HAL_Init();  // Initialize the HAL library
+	  SystemClock_Config();  // Configure the system clock
 
-  /* USER CODE END 1 */
+	  /* Initialize peripherals */
+	  MX_GPIO_Init();  // Initialize GPIO pins
+	  MX_I2C1_Init();  // Initialize I2C peripheral
 
-  /* MCU Configuration--------------------------------------------------------*/
+	  /* Initialize LCD and display messages */
+	  lcd_init();  // Initialize the LCD
+	  i2c_transmit_command(LCD_SET_ROW1_COL1);  // Set cursor at row 1, column 1
+	  LCD_Send_String("asdfgh5678");  // Display message
+	  HAL_Delay(3000);  // Wait for 3 seconds
 
-  /* Reset of all peripherals, Initializes the Flash interface and the Systick. */
-  HAL_Init();
+	  i2c_transmit_command(LCD_CLEAR_DISPLAY);  // Clear display
+	  i2c_transmit_command(LCD_SET_ROW1_COL1);  // Set cursor at row 1, column 1
+	  LCD_Send_String("n .nbb.,mb");  // Display message
+	  HAL_Delay(3000);  // Wait for 3 seconds
 
-  /* USER CODE BEGIN Init */
-
-  /* USER CODE END Init */
-
-  /* Configure the system clock */
-  SystemClock_Config();
-
-  /* USER CODE BEGIN SysInit */
-
-  /* USER CODE END SysInit */
-
-  /* Initialize all configured peripherals */
-  MX_GPIO_Init();
-  MX_I2C1_Init();
-  /* USER CODE BEGIN 2 */
-  HD44780_Init(2);
-  HD44780_Clear();
-  HD44780_SetCursor(0,0);
-  HD44780_PrintStr("HELLO");
-  HD44780_SetCursor(10,1);
-  HD44780_PrintStr("WORLD");
-  HAL_Delay(2000);
-
-  HD44780_Clear();
-  HD44780_SetCursor(0,0);
-  HD44780_PrintStr("HELLO");
-  HAL_Delay(2000);
-  HD44780_NoBacklight();
-  HAL_Delay(2000);
-  HD44780_Backlight();
-
-  HAL_Delay(2000);
-  HD44780_Cursor();
-  HAL_Delay(2000);
-  HD44780_Blink();
-  HAL_Delay(5000);
-  HD44780_NoBlink();
-  HAL_Delay(2000);
-  HD44780_NoCursor();
-  HAL_Delay(2000);
-
-  HD44780_NoDisplay();
-  HAL_Delay(2000);
-  HD44780_Display();
-
-  HD44780_Clear();
-  HD44780_SetCursor(0,0);
-  HD44780_PrintStr("Learning STM32 with LCD is fun :-)");
-  int x;
-  for(int x=0; x<40; x=x+1)
-  {
-    HD44780_ScrollDisplayLeft();  //HD44780_ScrollDisplayRight();
-    HAL_Delay(500);
-  }
-
-  char snum[5];
-  for ( int x = 1; x <= 200 ; x++ )
-  {
-    itoa(x, snum, 10);
-    HD44780_Clear();
-    HD44780_SetCursor(0,0);
-    HD44780_PrintStr(snum);
-    HAL_Delay (1000);
-  }
+	  i2c_transmit_command(LCD_CLEAR_DISPLAY);  // Clear display
+	  i2c_transmit_command(LCD_SET_ROW1_COL1);  // Set cursor at row 1, column 1
+	  LCD_Send_String("kodakara");  // Display message
+	  HAL_Delay(3000);  // Wait for 3 seconds
   /* USER CODE END 2 */
 
   /* Infinite loop */
@@ -148,6 +193,7 @@ int main(void)
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
+
   }
   /* USER CODE END 3 */
 }
