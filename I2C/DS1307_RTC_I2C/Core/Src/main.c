@@ -135,8 +135,8 @@ int main(void)
 
   /* USER CODE BEGIN 2 */
 
-  // Set initial date and time to - 2024-12-31 3(Tuesday) 23:59:40
-  DS1307_SetTime(24, 12, 31, 3, 23, 59, 40);
+
+  DS1307_SetTime(24, 12, 31, 3, 23, 59, 40); //YY-MM-DD-DAY-HR-MIN-SEC
 
   /* USER CODE END 2 */
 

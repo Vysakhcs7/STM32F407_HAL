@@ -13,15 +13,6 @@
  * in the root directory of this software component.
  * If no LICENSE file comes with this software, it is provided AS-IS.
  *
- *
- * 7bit Address				-	0011 1000	-	0x38
- * Initialization Command	-	1110 001	-	0x71
- * Trigger Measurement		-	1010 1100 	- 	0xAC
- * Soft Reset				- 	1011 1010 	- 	0xBA
- * PB6 						- 	SCL
- * PB7 						- 	SDA
- *
- *
  ******************************************************************************
  */
 /* USER CODE END Header */
@@ -30,7 +21,10 @@
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
+
 #include <stdio.h>
+#include <string.h>
+
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -41,9 +35,28 @@
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
 
+#define LCD_FUNCTION_SET1      0x33
+#define LCD_FUNCTION_SET2      0x32
+#define LCD_4BIT_2LINE_MODE    0x28
+#define LCD_DISP_CURS_ON       0x0E
+#define LCD_DISP_ON_CURS_OFF   0x0C  //Display on, cursor off
+#define LCD_DISPLAY_OFF        0x08
+#define LCD_DISPLAY_ON         0x04
+#define LCD_CLEAR_DISPLAY      0x01
+#define LCD_ENTRY_MODE_SET     0x04
+#define LCD_INCREMENT_CURSER   0x06
+#define LCD_SET_ROW1_COL1      0x80  //Force cursor to beginning ( 1st line)
+#define LCD_SET_ROW2_COL1      0xC0  //Force cursor to beginning ( 2nd line)
+#define LCD_MOVE_DISPLAY_LEFT  0x18
+#define LCD_MOVE_DISPLAY_RIGHT 0x1C
+
+#define slave_address      0x3F //LCD
+
 #define AHT25_ADDRESS	(0x38 << 1U)
 #define AHT25_RESET		(0xBA)
 #define AHT25_INIT_CMD	(0x71)
+
+#define DS1307_ADDRESS (0x68 << 1)  // Define DS1307 I2C address
 
 /* USER CODE END PD */
 
@@ -64,6 +77,12 @@ float temperature, humidity;
 uint32_t raw_humidity;
 uint32_t raw_temperature;
 
+char buffer_time[16];
+char buffer_date[16];
+uint8_t write_time_date[7];    // Buffer to store time data for writing
+uint8_t read_time_date[7];    // Buffer to store time data read from DS1307
+uint8_t bcd_time_date[7];    // Buffer to store time data in BCD format
+
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -72,10 +91,124 @@ static void MX_GPIO_Init(void);
 static void MX_I2C1_Init(void);
 /* USER CODE BEGIN PFP */
 
+void LCD_Transmit_Command(uint8_t data);
+void lcd_init(void);
+void LCD_Transmit_Data(uint8_t data);
+
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
+
+void lcd_init(void) {
+
+	/* Wait for 15ms */
+	HAL_Delay(15);
+
+	/*Function Set - As per HD44780U*/
+	LCD_Transmit_Command(LCD_FUNCTION_SET1);
+
+	/*Function Set -As per HD44780U*/
+	LCD_Transmit_Command(LCD_FUNCTION_SET2);
+
+	/*Set 4bit mode and 2 lines */
+	LCD_Transmit_Command(LCD_4BIT_2LINE_MODE);
+
+	/*Display on, cursor off*/
+	LCD_Transmit_Command(0x0C);
+
+	/* SET Row1 and Col1 (1st Line) */
+	LCD_Transmit_Command(0x80);
+
+	/*Clear Display*/
+	LCD_Transmit_Command(LCD_CLEAR_DISPLAY);
+}
+
+void LCD_Transmit_Command(uint8_t data) {
+	uint8_t command_en_on = ((data & 0xF0) | 0x0C); //LED ON, RW = 0, RS = 0, EN =1;
+	uint8_t command_en_off = (command_en_on & (~(1 << 2))); //LED ON, RW = 0, RS = 0, EN =0;
+
+	HAL_I2C_Master_Transmit(&hi2c1, slave_address << 1, &command_en_on, 1, 100);
+	HAL_Delay(2);
+	HAL_I2C_Master_Transmit(&hi2c1, slave_address << 1, &command_en_off, 1,
+			100);
+
+	uint8_t command_lsb_en_on = (((data << 4) & 0xF0) | 0X0C); //LED ON, RW = 0, RS = 0, EN =1;
+	uint8_t command_lsb_en_off = (command_lsb_en_on & (~(1 << 2))); //LED ON, RW = 0, RS = 0, EN =0;
+
+	HAL_I2C_Master_Transmit(&hi2c1, slave_address << 1, &command_lsb_en_on, 1,
+			100);
+	HAL_Delay(2);
+	HAL_I2C_Master_Transmit(&hi2c1, slave_address << 1, &command_lsb_en_off, 1,
+			100);
+}
+
+void LCD_Transmit_Data(uint8_t data) {
+	uint8_t data_en_on = ((data & 0xF0) | 0x0D); //LED ON, RW = 0, RS = 0, EN =1;
+	uint8_t data_en_off = (data_en_on & (~(1 << 2))); //LED ON, RW = 0, RS = 0, EN =0;
+
+	HAL_I2C_Master_Transmit(&hi2c1, slave_address << 1, &data_en_on, 1, 100);
+	HAL_Delay(2);
+	HAL_I2C_Master_Transmit(&hi2c1, slave_address << 1, &data_en_off, 1, 100);
+
+	uint8_t data_lsb_en_on = (((data << 4) & 0xF0) | 0X0D); //LED ON, RW = 0, RS = 0, EN =1;
+	uint8_t data_lsb_en_off = (data_lsb_en_on & (~(1 << 2))); //LED ON, RW = 0, RS = 0, EN =0;
+
+	HAL_I2C_Master_Transmit(&hi2c1, slave_address << 1, &data_lsb_en_on, 1,
+			100);
+	HAL_Delay(2);
+	HAL_I2C_Master_Transmit(&hi2c1, slave_address << 1, &data_lsb_en_off, 1,
+			100);
+}
+
+void LCD_Send_String(char *str) {
+	while (*str) {
+		LCD_Transmit_Data(*str++);
+	}
+}
+
+// Convert decimal to BCD (Binary-Coded Decimal)
+uint8_t DS1307_DEC2BCD(uint8_t dec) {
+	return ((dec / 10) << 4) | (dec % 10);
+}
+
+// Convert BCD to decimal
+uint8_t DS1307_BCD2DEC(uint8_t bcd) {
+	return ((bcd >> 4) * 10) + (bcd & 0x0F);
+}
+
+// Set the time on the DS1307 RTC
+void DS1307_SetTime(uint8_t year, uint8_t month, uint8_t date, uint8_t day,
+		uint8_t hour, uint8_t minute, uint8_t second) {
+	write_time_date[0] = DS1307_DEC2BCD(second);  // Convert seconds to BCD
+	write_time_date[1] = DS1307_DEC2BCD(minute);  // Convert minutes to BCD
+	write_time_date[2] = DS1307_DEC2BCD(hour);    // Convert hours to BCD
+	write_time_date[3] = DS1307_DEC2BCD(day);    // Convert hours to BCD
+	write_time_date[4] = DS1307_DEC2BCD(date);    // Convert hours to BCD
+	write_time_date[5] = DS1307_DEC2BCD(month);    // Convert hours to BCD
+	write_time_date[6] = DS1307_DEC2BCD(year);    // Convert hours to BCD
+
+	HAL_I2C_Mem_Write(&hi2c1, DS1307_ADDRESS, 0x00, I2C_MEMADD_SIZE_8BIT,
+			write_time_date, 7, HAL_MAX_DELAY);  // Write time data to DS1307
+}
+
+// Get the time from the DS1307 RTC
+void DS1307_GetTime() {
+
+	HAL_I2C_Mem_Read(&hi2c1, DS1307_ADDRESS, 0x00, I2C_MEMADD_SIZE_8BIT,
+			bcd_time_date, 7, HAL_MAX_DELAY);  // Read time data from DS1307
+	for (int i = 0; i < 7; i++) {
+		read_time_date[i] = DS1307_BCD2DEC(bcd_time_date[i]); // Convert BCD data to decimal
+		sprintf(buffer_time, "T:%u:%u:%u", read_time_date[2], read_time_date[1],
+				read_time_date[0]);  // Store the formatted string in 'buffer'
+		sprintf(buffer_date, "D:%u-%u-%u", read_time_date[4], read_time_date[5],
+				read_time_date[6]);  // Store the formatted string in 'buffer'
+		LCD_Transmit_Command(LCD_SET_ROW1_COL1); // Set cursor at row 1, column 1
+		LCD_Send_String(buffer_time);
+		LCD_Transmit_Command(LCD_SET_ROW2_COL1); // Set cursor at row 1, column 1
+		LCD_Send_String(buffer_date);
+	}
+}
 
 /* USER CODE END 0 */
 
@@ -86,6 +219,9 @@ static void MX_I2C1_Init(void);
 int main(void) {
 
 	/* USER CODE BEGIN 1 */
+
+	char buffer_hum[16];  // Buffer to hold the converted string
+	char buffer_temp[26];
 
 	/* USER CODE END 1 */
 
@@ -110,16 +246,32 @@ int main(void) {
 	MX_I2C1_Init();
 	/* USER CODE BEGIN 2 */
 
-	HAL_I2C_Master_Transmit(&hi2c1, AHT25_ADDRESS, (uint8_t*) AHT25_RESET, 1,100);
+	lcd_init();  // Initialize the LCD
+
+	HAL_I2C_Master_Transmit(&hi2c1, AHT25_ADDRESS, (uint8_t*) AHT25_RESET, 1,
+			100);
 	HAL_Delay(100);
-	HAL_I2C_Master_Transmit(&hi2c1, AHT25_ADDRESS, (uint8_t*) AHT25_INIT_CMD, 1,100);
+	HAL_I2C_Master_Transmit(&hi2c1, AHT25_ADDRESS, (uint8_t*) AHT25_INIT_CMD, 1,
+			100);
 	HAL_I2C_Master_Receive(&hi2c1, AHT25_ADDRESS, &status, 1, 100);
 	if ((status & 0x18) == 0x18) {
-		printf("Initialization successful.\r\n");
+		LCD_Transmit_Command(LCD_SET_ROW1_COL1); // Set cursor at row 1, column 1
+		LCD_Send_String("Init Success");  // Display message
+		HAL_Delay(500);
 
 	} else {
-		printf("Initialization Failed.Initialize the 0x1B, 0x1C and 0x1E registers.\r\n");
+		while (1) {
+			LCD_Transmit_Command(LCD_CLEAR_DISPLAY);
+			LCD_Transmit_Command(LCD_SET_ROW1_COL1); // Set cursor at row 1, column 1
+			LCD_Send_String("Init Failed");  // Display message
+			HAL_Delay(1000);
+			LCD_Transmit_Command(LCD_CLEAR_DISPLAY);
+
+		}
 	}
+	HAL_Delay(10);
+
+	DS1307_SetTime(24, 9, 20, 5, 18, 24, 00); //YY-MM-DD-DAY-HR-MIN-SEC
 
 	/* USER CODE END 2 */
 
@@ -130,7 +282,11 @@ int main(void) {
 
 		/* USER CODE BEGIN 3 */
 
-		HAL_Delay(10);
+		LCD_Transmit_Command(LCD_CLEAR_DISPLAY);
+
+		DS1307_GetTime();  // Get time
+
+		LCD_Transmit_Command(LCD_CLEAR_DISPLAY);
 		HAL_I2C_Master_Transmit(&hi2c1, AHT25_ADDRESS, trigger_cmd, 3, 100);
 
 		HAL_Delay(80);
@@ -152,15 +308,20 @@ int main(void) {
 		raw_temperature = (raw_temperature << 8) | (raw_reading[4]);
 		raw_temperature = (raw_temperature << 8) | (raw_reading[5]);
 
-		//raw_humidity = ((uint32_t)data[1] << 12) | ((uint32_t)data[2] << 4) | ((data[3] & 0xF0) >> 4);
-		//raw_temperature = (((uint32_t)data[3] & 0x0F) << 16) | ((uint32_t)data[4] << 8) | data[5];
-
 		humidity = (raw_humidity / 1048576.0) * 100.0;
 		temperature = (((raw_temperature / 1048576.0) * 200.0) - 50.0);
-		printf("Humidity : %f \r\n", humidity);
-		printf("Temperature : %f \r\n\n", temperature);
 
-		HAL_Delay(2000);
+		LCD_Transmit_Command(LCD_SET_ROW1_COL1); // Set cursor at row 1, column 1
+
+		// Convert integer to string
+		sprintf(buffer_hum, "Humidity: %.2f%%", humidity); // Store the formatted string in 'buffer'
+		LCD_Send_String(buffer_hum);
+		LCD_Transmit_Command(LCD_SET_ROW2_COL1); // Set cursor at row 1, column 1
+		sprintf(buffer_temp, "Temp: %.2f C", temperature); // Store the formatted string in 'buffer'
+		LCD_Send_String(buffer_temp);
+
+		HAL_Delay(3000);
+
 	}
 	/* USER CODE END 3 */
 }
@@ -250,7 +411,6 @@ static void MX_GPIO_Init(void) {
 	/* USER CODE END MX_GPIO_Init_1 */
 
 	/* GPIO Ports Clock Enable */
-	__HAL_RCC_GPIOA_CLK_ENABLE();
 	__HAL_RCC_GPIOB_CLK_ENABLE();
 
 	/* USER CODE BEGIN MX_GPIO_Init_2 */

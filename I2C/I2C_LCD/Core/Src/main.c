@@ -148,19 +148,36 @@ void LCD_Send_String(char *str)
   */
 int main(void)
 {
-	  /* MCU Configuration and Initialization */
-	  HAL_Init();  // Initialize the HAL library
-	  SystemClock_Config();  // Configure the system clock
 
-	  /* Initialize peripherals */
-	  MX_GPIO_Init();  // Initialize GPIO pins
-	  MX_I2C1_Init();  // Initialize I2C peripheral
+  /* USER CODE BEGIN 1 */
 
-	  /* Initialize LCD and display messages */
-	  lcd_init();  // Initialize the LCD
-	  LCD_Transmit_Command(LCD_SET_ROW1_COL1);  // Set cursor at row 1, column 1
-	  LCD_Send_String("Hi there...!!!");  // Display message
-	  HAL_Delay(3000);  // Wait for 3 seconds
+  /* USER CODE END 1 */
+
+  /* MCU Configuration--------------------------------------------------------*/
+
+  /* Reset of all peripherals, Initializes the Flash interface and the Systick. */
+  HAL_Init();
+
+  /* USER CODE BEGIN Init */
+
+  /* USER CODE END Init */
+
+  /* Configure the system clock */
+  SystemClock_Config();
+
+  /* USER CODE BEGIN SysInit */
+
+  /* USER CODE END SysInit */
+
+  /* Initialize all configured peripherals */
+  MX_GPIO_Init();
+  MX_I2C1_Init();
+  /* USER CODE BEGIN 2 */
+
+  lcd_init();  // Initialize the LCD
+  LCD_Transmit_Command(LCD_SET_ROW1_COL1);  // Set cursor at row 1, column 1
+
+
 
   /* USER CODE END 2 */
 
@@ -171,6 +188,8 @@ int main(void)
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
+	  LCD_Send_String("Hi there...!!!");  // Display message
+	  HAL_Delay(3000);  // Wait for 3 seconds
 
   }
   /* USER CODE END 3 */
@@ -263,12 +282,24 @@ static void MX_I2C1_Init(void)
   */
 static void MX_GPIO_Init(void)
 {
+  GPIO_InitTypeDef GPIO_InitStruct = {0};
 /* USER CODE BEGIN MX_GPIO_Init_1 */
 /* USER CODE END MX_GPIO_Init_1 */
 
   /* GPIO Ports Clock Enable */
+  __HAL_RCC_GPIOD_CLK_ENABLE();
   __HAL_RCC_GPIOA_CLK_ENABLE();
   __HAL_RCC_GPIOB_CLK_ENABLE();
+
+  /*Configure GPIO pin Output Level */
+  HAL_GPIO_WritePin(GPIOD, GPIO_PIN_14, GPIO_PIN_RESET);
+
+  /*Configure GPIO pin : PD14 */
+  GPIO_InitStruct.Pin = GPIO_PIN_14;
+  GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
+  GPIO_InitStruct.Pull = GPIO_NOPULL;
+  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
+  HAL_GPIO_Init(GPIOD, &GPIO_InitStruct);
 
 /* USER CODE BEGIN MX_GPIO_Init_2 */
 /* USER CODE END MX_GPIO_Init_2 */
