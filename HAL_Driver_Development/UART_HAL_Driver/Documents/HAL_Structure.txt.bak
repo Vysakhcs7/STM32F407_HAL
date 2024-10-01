@@ -1,0 +1,3 @@
+The first function to be called after main() is the HAL_Init()
+Then SystemClock_Config() (If didnt called still it will work since it will use internal but if needed more clock spurce you will have to add it).
+

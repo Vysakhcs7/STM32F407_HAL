@@ -1,0 +1,15 @@
+The first function to be called after main() is the HAL_Init()
+
+HAL_Init() do the followings:
+Flash Interface unit (stm32f4xx_hal_conf.h)
+Systick Timer init to generate interrupt for 1 ms
+Other processor specific low level init(calls HAL_MspInit() -> stm32f4xx_hal_msp.c)
+MspInit -> Low level init like setting NVIC priority,enabling required system exceptions,enable and cofigure others such as MPU,FPU,etc
+
+
+
+
+Then SystemClock_Config() (If didnt called still it will work since it will use internal but 
+if needed more clock spurce you will have to add it).
+
+

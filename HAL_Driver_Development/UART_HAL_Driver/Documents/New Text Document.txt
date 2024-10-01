@@ -1,0 +1,74 @@
+If NVIC_PRIORITYGROUP_0 is set, meaning all 4 bits are allocated to preemption priority and 0 bits are available for subpriority, then all interrupts are distinguished only by their preemption priority value. If two interrupts with the same preemption priority occur simultaneously, the interrupt controller handles them based on their hardware interrupt number (IRQ number).
+
+In such a scenario:
+
+The interrupt with the lower IRQ number will be given higher priority by the hardware, meaning it will be serviced first if multiple interrupts have the same preemption priority.
+The other interrupt will be held pending until the first one is completed.
+For example, if two interrupts (IRQn1 and IRQn2) with the same preemption priority are triggered at the same time:
+
+If IRQn1 has a lower IRQ number compared to IRQn2, IRQn1 will be serviced first.
+After IRQn1 is completed, IRQn2 will be serviced.
+This behavior is controlled automatically by the Nested Vectored Interrupt Controller (NVIC) of the Cortex-M processor.
+
+
+
+
+
+
+
+In the STM32F407, the Nested Vectored Interrupt Controller (NVIC) manages interrupts by using a preemption priority, a subpriority, and the IRQ number of each interrupt. Let's break down how these parameters work together in a real example.
+
+1. Preemption Priority
+This determines whether an interrupt can preempt (interrupt) another currently executing interrupt. A lower numerical value means a higher priority.
+For instance, if a Timer 2 interrupt (TIM2_IRQn) has a preemption priority of 1 and a USART1 interrupt (USART1_IRQn) has a preemption priority of 3, the Timer 2 interrupt will have a higher priority and can preempt the USART1 interrupt if it occurs while USART1 is executing.
+2. Subpriority
+Subpriority is used when two interrupts have the same preemption priority to determine which one should be serviced first.
+If both the Timer 2 interrupt and USART1 interrupt have a preemption priority of 2, then the subpriority will determine the order of servicing.
+Suppose Timer 2 has a subpriority of 0, and USART1 has a subpriority of 1. In this case, if both interrupts are pending, Timer 2 will be serviced before USART1.
+3. IRQ Number
+The IRQ number uniquely identifies each interrupt line and is used by the NVIC to manage interrupts.
+The IRQ number plays a role when two interrupts have the same preemption priority and subpriority. If both interrupts occur simultaneously, the interrupt with the lower IRQ number will be serviced first.
+For example, if TIM2_IRQn (IRQ number 28) and USART1_IRQn (IRQ number 37) have the same preemption priority and subpriority, TIM2_IRQn will be serviced first because it has a lower IRQ number.
+Practical Configuration in STM32F407
+Let’s consider a scenario where we have three interrupts:
+
+Timer 2 interrupt (TIM2_IRQn)
+
+Preemption Priority: 1
+Subpriority: 0
+IRQ Number: 28
+USART1 interrupt (USART1_IRQn)
+
+Preemption Priority: 1
+Subpriority: 1
+IRQ Number: 37
+External interrupt line 0 (EXTI0_IRQn)
+
+Preemption Priority: 0
+Subpriority: 0
+IRQ Number: 6
+Configuring the NVIC
+c
+Copy code
+// Set priority grouping to allocate 2 bits for preemption priority and 2 bits for subpriority
+NVIC_SetPriorityGrouping(NVIC_PRIORITYGROUP_2);
+
+// Set priorities for the interrupts
+NVIC_SetPriority(TIM2_IRQn, NVIC_EncodePriority(NVIC_GetPriorityGrouping(), 1, 0));
+NVIC_SetPriority(USART1_IRQn, NVIC_EncodePriority(NVIC_GetPriorityGrouping(), 1, 1));
+NVIC_SetPriority(EXTI0_IRQn, NVIC_EncodePriority(NVIC_GetPriorityGrouping(), 0, 0));
+Interrupt Handling Behavior
+EXTI0_IRQn (External Interrupt Line 0)
+Has the highest preemption priority (0).
+Can preempt both Timer 2 and USART1 interrupts if they are running.
+TIM2_IRQn (Timer 2) and USART1_IRQn (USART1)
+Both have the same preemption priority (1), which means neither can preempt the other based on preemption priority.
+However, Timer 2 has a lower subpriority (0) compared to USART1 (1). Thus, Timer 2 will be serviced before USART1 if both interrupts are pending simultaneously.
+IRQ Number Handling
+If TIM2_IRQn and USART1_IRQn have the same preemption priority and subpriority, the IRQ number will determine the order.
+Since TIM2_IRQn (IRQ 28) has a lower IRQ number compared to USART1_IRQn (IRQ 37), it will be serviced first if both occur at the same time.
+Summary
+Preemption Priority: Determines which interrupt can interrupt another.
+Subpriority: Determines the order when multiple interrupts have the same preemption priority.
+IRQ Number: Used by the NVIC as a tie-breaker when both preemption priority and subpriority are identical.
+In this STM32F407 example, EXTI0_IRQn always has the highest priority due to the lowest preemption value, Timer 2 has priority over USART1 due to subpriority, and the IRQ number is used when both preemption and subpriority are identical.
