@@ -1,4 +1,0 @@
-Src/core_util.o: ../Src/core_util.c ../Inc/coremark.h \
- ../Inc/core_portme.h
-../Inc/coremark.h:
-../Inc/core_portme.h:
