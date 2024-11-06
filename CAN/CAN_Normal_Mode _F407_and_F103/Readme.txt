@@ -1,0 +1,1 @@
+The other file is in the STM32F103C8T6 folder.
